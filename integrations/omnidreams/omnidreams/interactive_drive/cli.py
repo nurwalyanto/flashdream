@@ -12,11 +12,10 @@ from omnidreams.hf_org import DEFAULT_HF_ORG, apply_cli_to_env
 from omnidreams.hf_org import ENV_VAR as _HF_ORG_ENV_VAR
 from omnidreams.interactive_drive.app import InteractiveDriveApp
 from omnidreams.interactive_drive.backends.base import RenderBackend
-from omnidreams.interactive_drive.backends.grpc_world_model import (
-    GrpcWorldModelRenderBackend,
-)
-from omnidreams.interactive_drive.backends.raster import RasterRenderBackend
 from omnidreams.interactive_drive.backends.world_model import WorldModelRenderBackend
+
+# RasterRenderBackend / GrpcWorldModelRenderBackend are lazy-imported
+# in prepare_config_and_backend to avoid pulling torch into CPU-only paths.
 from omnidreams.interactive_drive.config import (
     AppConfig,
     BevConfig,
@@ -476,8 +475,10 @@ def prepare_config_and_backend(
 
     backend: RenderBackend
     if args.grpc_endpoint is not None:
-        # Cloud gRPC backend: model runs remotely, rasterizer stays local.
-        # The manifest is still needed for resolution alignment.
+        from omnidreams.interactive_drive.backends.grpc_world_model import (
+            GrpcWorldModelRenderBackend,
+        )
+
         config = replace(config, backend="omnidreams")
         if config.manifest_path is not None:
             manifest = load_world_model_manifest(config.manifest_path)
@@ -498,6 +499,10 @@ def prepare_config_and_backend(
             bev=config.bev,
         )
     elif config.backend == "raster":
+        from omnidreams.interactive_drive.backends.raster import (
+            RasterRenderBackend,
+        )
+
         backend = RasterRenderBackend(
             chunk=config.chunk, raster=config.raster, bev=config.bev
         )
