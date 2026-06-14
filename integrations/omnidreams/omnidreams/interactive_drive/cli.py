@@ -12,6 +12,9 @@ from omnidreams.hf_org import DEFAULT_HF_ORG, apply_cli_to_env
 from omnidreams.hf_org import ENV_VAR as _HF_ORG_ENV_VAR
 from omnidreams.interactive_drive.app import InteractiveDriveApp
 from omnidreams.interactive_drive.backends.base import RenderBackend
+from omnidreams.interactive_drive.backends.grpc_world_model import (
+    GrpcWorldModelRenderBackend,
+)
 from omnidreams.interactive_drive.backends.raster import RasterRenderBackend
 from omnidreams.interactive_drive.backends.world_model import WorldModelRenderBackend
 from omnidreams.interactive_drive.config import (
@@ -226,6 +229,18 @@ def build_parser() -> argparse.ArgumentParser:
             "Exit cleanly after consuming chunk index N from the present "
             "queue. Used by internal latency tracing; chunk 0 is warmup, so "
             "N yields N traced chunks (1..N)."
+        ),
+    )
+    parser.add_argument(
+        "--grpc-endpoint",
+        type=str,
+        default=None,
+        metavar="HOST:PORT",
+        help=(
+            "Run world-model inference through a remote gRPC server instead of "
+            "locally. The scene USDZ is still loaded on this machine to extract "
+            "the HDMap and first-frame data, which is sent to the remote server "
+            "once per scene. The server must have the same pipeline config loaded."
         ),
     )
     parser.add_argument(
@@ -460,7 +475,29 @@ def prepare_config_and_backend(
     )
 
     backend: RenderBackend
-    if config.backend == "raster":
+    if args.grpc_endpoint is not None:
+        # Cloud gRPC backend: model runs remotely, rasterizer stays local.
+        # The manifest is still needed for resolution alignment.
+        config = replace(config, backend="omnidreams")
+        if config.manifest_path is not None:
+            manifest = load_world_model_manifest(config.manifest_path)
+            if config.raster.resolution_wh != manifest.resolution_wh:
+                config = replace(
+                    config,
+                    raster=replace(
+                        config.raster,
+                        width=manifest.resolution_wh[0],
+                        height=manifest.resolution_wh[1],
+                    ),
+                )
+        backend = GrpcWorldModelRenderBackend(
+            endpoint=args.grpc_endpoint,
+            scene_path=scene_path,
+            chunk=config.chunk,
+            raster=config.raster,
+            bev=config.bev,
+        )
+    elif config.backend == "raster":
         backend = RasterRenderBackend(
             chunk=config.chunk, raster=config.raster, bev=config.bev
         )

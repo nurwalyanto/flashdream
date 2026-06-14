@@ -4,7 +4,15 @@
 """Renderer backends."""
 
 from omnidreams.interactive_drive.backends.base import RenderBackend
+from omnidreams.interactive_drive.backends.grpc_world_model import (
+    GrpcWorldModelRenderBackend,
+)
 from omnidreams.interactive_drive.backends.raster import RasterRenderBackend
 from omnidreams.interactive_drive.backends.world_model import WorldModelRenderBackend
 
-__all__ = ["RenderBackend", "RasterRenderBackend", "WorldModelRenderBackend"]
+__all__ = [
+    "RenderBackend",
+    "GrpcWorldModelRenderBackend",
+    "RasterRenderBackend",
+    "WorldModelRenderBackend",
+]
